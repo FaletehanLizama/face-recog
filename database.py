@@ -13,10 +13,12 @@ from typing import Dict, List, Optional, Tuple
 import gspread
 from google.oauth2.service_account import Credentials
 
-credentials = Credentials.from_service_account_file(
-    'path/to/your-service-account.json',
-    scopes=['https://www.googleapis.com/auth/cloud-platform']
-)
+#credentials = Credentials.from_service_account_file(
+ #   'credentials.json',  
+  #  scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+#)
+
+#gc = gspread.authorize(credentials)
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,7 @@ class FaceDatabase:
     def __init__(
         self,
         credentials_path: str = "credentials.json",
-        spreadsheet_name: str = "FaceRecognitionDB",
+        spreadsheet_name: str = "1E6QOsZQx3vRpl5P49mXCmdzOvJhlbYhAL7hyZnkaCGI",
     ):
         """Initialize the database connection."""
         self.credentials_path = credentials_path
@@ -57,24 +59,16 @@ class FaceDatabase:
 
             scopes = [
                 "https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/drive.file",
-            ]
+                ]
 
             credentials = Credentials.from_service_account_file(
                 self.credentials_path, scopes=scopes
             )
             self.gc = gspread.authorize(credentials)
 
-            try:
-                spreadsheet = self.gc.open(self.spreadsheet_name)
-            except gspread.SpreadsheetNotFound:
-                logger.info(f"Creating new spreadsheet: {self.spreadsheet_name}")
-                spreadsheet = self.gc.create(self.spreadsheet_name)
-
-            try:
-                self.worksheet = spreadsheet.sheet1
-            except Exception:
-                self.worksheet = spreadsheet.add_worksheet("Faces", 1000, 5)
+            # Use open_by_key for spreadsheet ID
+            spreadsheet = self.gc.open_by_key(self.spreadsheet_name)
+            self.worksheet = spreadsheet.sheet1
 
             if not self.worksheet.get_all_records():
                 self.worksheet.append_row(HEADERS)
@@ -84,6 +78,13 @@ class FaceDatabase:
             logger.info("Successfully connected to Google Sheets")
             return True
 
+        except gspread.SpreadsheetNotFound:
+            logger.error(
+                f"Spreadsheet '{self.spreadsheet_name}' not found or no access. "
+                "Make sure the sheet is shared with the service account."
+            )
+            self._load_local_cache()
+            return False
         except Exception as e:
             logger.error(f"Failed to connect to Google Sheets: {e}")
             self._load_local_cache()
@@ -262,7 +263,7 @@ _db_instance: Optional[FaceDatabase] = None
 
 def get_database(
     credentials_path: str = "credentials.json",
-    spreadsheet_name: str = "FaceRecognitionDB",
+    spreadsheet_name: str = "1E6QOsZQx3vRpl5P49mXCmdzOvJhlbYhAL7hyZnkaCGI",
 ) -> FaceDatabase:
     """Get or create the database singleton instance."""
     global _db_instance
